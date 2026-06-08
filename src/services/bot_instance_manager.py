@@ -1272,5 +1272,6 @@ class BotInstanceManager:
         return status
 
 
-# 鍏ㄥ眬瀹炰緥绠＄悊鍣?bot_instance_manager = BotInstanceManager()
+# Global singleton instance manager
+bot_instance_manager = BotInstanceManager()
 
