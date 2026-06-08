@@ -1,12 +1,8 @@
-"""
-SaaS Bot实例管理器
-
-提供完整的Bot实例生命周期管理：
-- 进程监控和自动重启
-- 健康检查
-- 资源限制
-- 订阅到期自动停止
-- 定期清理无效实例
+﻿"""
+SaaS Bot瀹炰緥绠＄悊鍣?
+鎻愪緵瀹屾暣鐨凚ot瀹炰緥鐢熷懡鍛ㄦ湡绠＄悊锛?- 杩涚▼鐩戞帶鍜岃嚜鍔ㄩ噸鍚?- 鍋ュ悍妫€鏌?- 璧勬簮闄愬埗
+- 璁㈤槄鍒版湡鑷姩鍋滄
+- 瀹氭湡娓呯悊鏃犳晥瀹炰緥
 """
 import os
 import sys
@@ -28,48 +24,38 @@ logger = logging.getLogger(__name__)
 
 class BotInstanceManager:
     """
-    Bot实例管理器
-    
-    负责：
-    1. 启动和停止Bot实例
-    2. 监控进程健康状态
-    3. 自动重启崩溃的进程
-    4. 订阅到期自动停止
-    5. 清理无效实例
+    Bot瀹炰緥绠＄悊鍣?    
+    璐熻矗锛?    1. 鍚姩鍜屽仠姝ot瀹炰緥
+    2. 鐩戞帶杩涚▼鍋ュ悍鐘舵€?    3. 鑷姩閲嶅惎宕╂簝鐨勮繘绋?    4. 璁㈤槄鍒版湡鑷姩鍋滄
+    5. 娓呯悊鏃犳晥瀹炰緥
     """
     
     def __init__(self):
-        # ⭐ Runtime Registry - 完整的运行时状态管理
-        self.runtime_registry: Dict[str, dict] = {}  # {instance_id: runtime_info}
+        # 猸?Runtime Registry - 瀹屾暣鐨勮繍琛屾椂鐘舵€佺鐞?        self.runtime_registry: Dict[str, dict] = {}  # {instance_id: runtime_info}
         
-        # 存储运行中的进程: {instance_id: process_info}
+        # 瀛樺偍杩愯涓殑杩涚▼: {instance_id: process_info}
         self.running_processes: Dict[str, dict] = {}
         
-        # 进程重启计数: {instance_id: restart_count}
+        # 杩涚▼閲嶅惎璁℃暟: {instance_id: restart_count}
         self.restart_counts: Dict[str, int] = {}
         
-        # 重启时间窗口记录: {instance_id: [timestamp1, timestamp2, ...]}
+        # 閲嶅惎鏃堕棿绐楀彛璁板綍: {instance_id: [timestamp1, timestamp2, ...]}
         self.restart_timestamps: Dict[str, list] = {}
         
-        # 最大重启次数（本地测试时禁用，运营时启用）
-        self.max_restart_count = None  # None表示无限制
+        # 鏈€澶ч噸鍚鏁帮紙鏈湴娴嬭瘯鏃剁鐢紝杩愯惀鏃跺惎鐢級
+        self.max_restart_count = None  # None琛ㄧず鏃犻檺鍒?        
+        # 猸?閲嶅惎闄愭祦绛栫暐锛?鍒嗛挓鍐呮渶澶氶噸鍚?娆★紙鏈湴娴嬭瘯鏃剁鐢級
+        self.restart_window_seconds = 0  # 猸?鏈湴娴嬭瘯锛?琛ㄧず绂佺敤鏃堕棿绐楀彛
+        self.max_restarts_in_window = None  # 猸?鏈湴娴嬭瘯锛歂one琛ㄧず鏃犻檺鍒?        
+        # 鍋ュ悍妫€鏌ラ棿闅旓紙绉掞級
+        self.health_check_interval = 30  # 猸?浠?0绉掔缉鐭埌30绉掞紝鏇村揩鍙戠幇闂
         
-        # ⭐ 重启限流策略：5分钟内最多重启3次（本地测试时禁用）
-        self.restart_window_seconds = 0  # ⭐ 本地测试：0表示禁用时间窗口
-        self.max_restarts_in_window = None  # ⭐ 本地测试：None表示无限制
+        # 璁㈤槄妫€鏌ラ棿闅旓紙绉掞級
+        self.subscription_check_interval = 3600  # 姣忓皬鏃?        
+        # 閲嶅惎闂撮殧锛堟湰鍦版祴璇曟椂绂佺敤锛岃繍钀ユ椂鍚敤锛?        self.restart_delay = 0  # 0琛ㄧず绔嬪嵆閲嶅惎锛屾棤寤惰繜
         
-        # 健康检查间隔（秒）
-        self.health_check_interval = 30  # ⭐ 从60秒缩短到30秒，更快发现问题
-        
-        # 订阅检查间隔（秒）
-        self.subscription_check_interval = 3600  # 每小时
-        
-        # 重启间隔（本地测试时禁用，运营时启用）
-        self.restart_delay = 0  # 0表示立即重启，无延迟
-        
-        # ⭐ 心跳超时阈值（秒）- 超过此时间未更新心跳视为异常
-        self.heartbeat_timeout = 90  # 90秒（3倍于正常心跳间隔）
-        
+        # 猸?蹇冭烦瓒呮椂闃堝€硷紙绉掞級- 瓒呰繃姝ゆ椂闂存湭鏇存柊蹇冭烦瑙嗕负寮傚父
+        self.heartbeat_timeout = 90  # 90绉掞紙3鍊嶄簬姝ｅ父蹇冭烦闂撮殧锛?        
     def resolve_runtime_instance_dir(self, bot_creation: BotCreation) -> Path:
         """Resolve an instance directory that actually exists in the current runtime."""
         candidates: list[Path] = []
@@ -97,11 +83,8 @@ class BotInstanceManager:
 
     async def _discover_recoverable_bots_from_filesystem(self, db, existing_instance_ids: set[str]) -> list[BotCreation]:
         """
-        从实例目录扫描可恢复的子 Bot。
-
-        适用于数据库记录丢失、但 bot_instances/instances 目录仍保留的场景。
-        会在数据库中补建缺失的 BotCreation 和 owner 管理员记录，再返回可启动对象。
-        """
+        浠庡疄渚嬬洰褰曟壂鎻忓彲鎭㈠鐨勫瓙 Bot銆?
+        閫傜敤浜庢暟鎹簱璁板綍涓㈠け銆佷絾 bot_instances/instances 鐩綍浠嶄繚鐣欑殑鍦烘櫙銆?        浼氬湪鏁版嵁搴撲腑琛ュ缓缂哄け鐨?BotCreation 鍜?owner 绠＄悊鍛樿褰曪紝鍐嶈繑鍥炲彲鍚姩瀵硅薄銆?        """
         from ..repositories.bot_management_repo import BotAdminRepository
         from ..services.env_validator import EnvValidator
         from ..utils.token_encryptor import token_encryptor
@@ -294,13 +277,12 @@ class BotInstanceManager:
 
     async def start_bot_instance(self, bot_creation: BotCreation) -> bool:
         """
-        启动Bot实例（带资源限制和监控 + 幂等控制 + .env验证修复）
-        
+        鍚姩Bot瀹炰緥锛堝甫璧勬簮闄愬埗鍜岀洃鎺?+ 骞傜瓑鎺у埗 + .env楠岃瘉淇锛?        
         Args:
-            bot_creation: Bot创建记录
+            bot_creation: Bot鍒涘缓璁板綍
         
         Returns:
-            是否成功启动
+            鏄惁鎴愬姛鍚姩
         """
         from .bot_instance_registry import bot_instance_registry
         from .env_validator import EnvAutoRepair
@@ -317,12 +299,11 @@ class BotInstanceManager:
                 bot_creation.instance_dir = str(resolved_instance_dir)
                 bot_creation.env_path = str(resolved_instance_dir / ".env")
             
-            # 🔥 Phase 2-3: 幂等控制 - 检查是否可以启动
+            # Phase 2-3: check whether startup is allowed
             if not bot_instance_registry.can_start(instance_id):
-                logger.warning(f"[BotInstanceManager] ❌ BOT {instance_id} 已在运行中或正在启动，跳过")
-                return True  # 返回True表示"已运行"，不是错误
-            
-            # 🔥 Phase 2-1: .env 验证和自动修复
+                logger.warning(f"[BotInstanceManager] BOT {instance_id} is already running or starting, skipping")
+                return True
+            # Phase 2-1: validate and auto-repair .env
             try:
                 decrypted_token = token_encryptor.decrypt_from_base64(bot_creation.bot_token)
                 env_valid, env_result = await EnvAutoRepair.validate_and_repair(
@@ -334,24 +315,24 @@ class BotInstanceManager:
                     auto_repair=True
                 )
                 if not env_valid:
-                    logger.error(f"[BotInstanceManager] ❌ BOT {instance_id} .env 验证失败且无法修复: {env_result.errors}")
+                    logger.error(f"[BotInstanceManager] 鉂?BOT {instance_id} .env 楠岃瘉澶辫触涓旀棤娉曚慨澶? {env_result.errors}")
                     return False
             except Exception as e:
-                logger.error(f"[BotInstanceManager] ❌ BOT {instance_id} .env 验证异常: {e}")
+                logger.error(f"[BotInstanceManager] 鉂?BOT {instance_id} .env 楠岃瘉寮傚父: {e}")
                 return False
             
-            # 🔥 Phase 2-3: 标记为启动中
+            # 馃敟 Phase 2-3: 鏍囪涓哄惎鍔ㄤ腑
             if not bot_instance_registry.mark_starting(instance_id):
-                logger.warning(f"[BotInstanceManager] ❌ BOT {instance_id} 无法标记为 starting，可能已在运行中")
+                logger.warning(f"[BotInstanceManager] 鉂?BOT {instance_id} 鏃犳硶鏍囪涓?starting锛屽彲鑳藉凡鍦ㄨ繍琛屼腑")
                 return True
             
-            # ✅ 关键修复：启动前先检查并停止可能存在的旧进程
+            # 鉁?鍏抽敭淇锛氬惎鍔ㄥ墠鍏堟鏌ュ苟鍋滄鍙兘瀛樺湪鐨勬棫杩涚▼
             if bot_creation.process_id:
                 try:
                     import psutil
                     if psutil.pid_exists(bot_creation.process_id):
                         old_process = psutil.Process(bot_creation.process_id)
-                        # 检查是否是 Python 进程
+                        # 妫€鏌ユ槸鍚︽槸 Python 杩涚▼
                         if 'python' in old_process.name().lower():
                             logger.warning(f"Found old process for {instance_id} (PID: {bot_creation.process_id}), stopping it...")
                             old_process.terminate()
@@ -360,44 +341,41 @@ class BotInstanceManager:
                 except Exception as e:
                     logger.warning(f"Failed to stop old process: {e}")
             
-            # 检查是否已经在运行（旧逻辑，保留作为双重检查）
+            # 妫€鏌ユ槸鍚﹀凡缁忓湪杩愯锛堟棫閫昏緫锛屼繚鐣欎綔涓哄弻閲嶆鏌ワ級
             if instance_id in self.running_processes:
                 proc_info = self.running_processes[instance_id]
                 if proc_info['process'].poll() is None:
                     logger.warning(f"Bot {instance_id} is already running")
-                    # 同步 registry 状态
+                    # 鍚屾 registry 鐘舵€?                    bot_instance_registry.mark_running(instance_id, proc_info['process'])
+                    # sync runtime registry state
                     bot_instance_registry.mark_running(instance_id, proc_info['process'])
-                    return True
                 else:
-                    # 进程已结束，清理旧记录
+                    # 杩涚▼宸茬粨鏉燂紝娓呯悊鏃ц褰?                    del self.running_processes[instance_id]
+                    # process already exited, clean stale runtime record
                     del self.running_processes[instance_id]
-            
-            # 构建启动命令
+            # 鏋勫缓鍚姩鍛戒护
             start_script = resolved_instance_dir / "start.py"
             
             if not start_script.exists():
                 logger.error(f"Start script not found: {start_script}")
                 return False
             
-            # 设置资源限制（Windows下有限支持）
+            # 璁剧疆璧勬簮闄愬埗锛圵indows涓嬫湁闄愭敮鎸侊級
             if os.name == 'nt':
-                # Windows: 使用 DETACHED_PROCESS 或 CREATE_NO_WINDOW
-                # 关键修复：将子Bot日志输出到文件，便于调试
+                # Windows: 浣跨敤 DETACHED_PROCESS 鎴?CREATE_NO_WINDOW
+                # 鍏抽敭淇锛氬皢瀛怋ot鏃ュ織杈撳嚭鍒版枃浠讹紝渚夸簬璋冭瘯
                 stdout_file = open(str(resolved_instance_dir / "bot.log"), "a", encoding="utf-8")
                 stderr_file = open(str(resolved_instance_dir / "error.log"), "a", encoding="utf-8")
                 
                 process = subprocess.Popen(
                     [sys.executable, str(start_script)],
                     cwd=str(resolved_instance_dir),
-                    stdout=stdout_file,  # 输出到日志文件
-                    stderr=stderr_file,  # 错误输出到日志文件
-                    stdin=subprocess.DEVNULL,
+                    stdout=stdout_file,  # 杈撳嚭鍒版棩蹇楁枃浠?                    stderr=stderr_file,  # 閿欒杈撳嚭鍒版棩蹇楁枃浠?                    stdin=subprocess.DEVNULL,
                     creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
                     close_fds=True
                 )
             else:
-                # Linux/Mac: 使用setsid和资源限制
-                # 🔥 关键修复：将子Bot日志输出到文件，避免PIPE阻塞
+                # Linux/Mac: 浣跨敤setsid鍜岃祫婧愰檺鍒?                # 馃敟 鍏抽敭淇锛氬皢瀛怋ot鏃ュ織杈撳嚭鍒版枃浠讹紝閬垮厤PIPE闃诲
                 stdout_file = open(str(resolved_instance_dir / "bot.log"), "a", encoding="utf-8")
                 stderr_file = open(str(resolved_instance_dir / "error.log"), "a", encoding="utf-8")
                 
@@ -411,10 +389,10 @@ class BotInstanceManager:
                     close_fds=True
                 )
             
-            # 🔥 Phase 2-3: 标记为运行中
+            # 馃敟 Phase 2-3: 鏍囪涓鸿繍琛屼腑
             bot_instance_registry.mark_running(instance_id, process)
             
-            # 记录进程信息（旧逻辑，保留兼容）
+            # 璁板綍杩涚▼淇℃伅锛堟棫閫昏緫锛屼繚鐣欏吋瀹癸級
             process_info = {
                 'process': process,
                 'pid': process.pid,
@@ -424,7 +402,7 @@ class BotInstanceManager:
             }
             self.running_processes[instance_id] = process_info
             
-            # ⭐ 初始化 Runtime Registry
+            # 猸?鍒濆鍖?Runtime Registry
             now = datetime.utcnow()
             self.runtime_registry[instance_id] = {
                 'runtime_status': 'running',
@@ -436,13 +414,12 @@ class BotInstanceManager:
                 'runtime_telegram_id': bot_creation.telegram_id,
                 'runtime_instance_dir': str(resolved_instance_dir),
                 'runtime_created_at': now,
-                'runtime_health_score': 100  # 健康度评分（0-100）
+                'runtime_health_score': 100,
             }
             
-            logger.info(f"✅ Runtime registry initialized for {instance_id}")
+            logger.info(f"鉁?Runtime registry initialized for {instance_id}")
             
-            # 更新数据库记录
-            bot_creation.status = "running"
+            # 鏇存柊鏁版嵁搴撹褰?            bot_creation.status = "running"
             bot_creation.process_id = process.pid
             bot_creation.started_at = datetime.utcnow()
             bot_creation.last_heartbeat = datetime.utcnow()
@@ -470,29 +447,28 @@ class BotInstanceManager:
             
         except Exception as e:
             logger.error(f"Error starting bot {bot_creation.instance_id}: {e}", exc_info=True)
-            # 🔥 Phase 2-3: 标记为失败
-            bot_instance_registry.mark_failed(bot_creation.instance_id, str(e))
+            # 馃敟 Phase 2-3: 鏍囪涓哄け璐?            bot_instance_registry.mark_failed(bot_creation.instance_id, str(e))
             bot_creation.status = "error"
             return False
     
     async def stop_bot_instance(self, instance_id: str, force: bool = False) -> bool:
         """
-        停止Bot实例
+        鍋滄Bot瀹炰緥
         
         Args:
-            instance_id: 实例ID
-            force: 是否强制停止
+            instance_id: 瀹炰緥ID
+            force: 鏄惁寮哄埗鍋滄
         
         Returns:
-            是否成功停止
+            鏄惁鎴愬姛鍋滄
         """
         from .bot_instance_registry import bot_instance_registry
         
-        # 🔥 Phase 2-3: 标记为停止中
+        # 馃敟 Phase 2-3: 鏍囪涓哄仠姝腑
         bot_instance_registry.mark_stopping(instance_id)
         
         try:
-            # 从数据库中获取Bot信息
+            # 浠庢暟鎹簱涓幏鍙朆ot淇℃伅
             async with get_db_session() as db:
                 query = select(BotCreation).where(BotCreation.instance_id == instance_id)
                 result = await db.execute(query)
@@ -502,40 +478,38 @@ class BotInstanceManager:
                     logger.error(f"Bot {instance_id} not found in database")
                     return False
                 
-                # 尝试从运行列表中停止
+                # 灏濊瘯浠庤繍琛屽垪琛ㄤ腑鍋滄
                 if instance_id in self.running_processes:
                     proc_info = self.running_processes[instance_id]
                     process = proc_info['process']
                     
                     if force:
-                        # 强制终止
+                        # 寮哄埗缁堟
                         process.kill()
                         logger.info(f"Force killed bot {instance_id} (PID: {process.pid})")
                     else:
-                        # 优雅终止
+                        # 浼橀泤缁堟
                         process.terminate()
                         try:
-                            process.wait(timeout=10)  # 等待10秒
-                            logger.info(f"Gracefully stopped bot {instance_id} (PID: {process.pid})")
+                            process.wait(timeout=10)  # 绛夊緟10绉?                            logger.info(f"Gracefully stopped bot {instance_id} (PID: {process.pid})")
                         except subprocess.TimeoutExpired:
                             process.kill()
                             logger.warning(f"Bot {instance_id} didn't stop gracefully, force killed")
                     
-                    # 清理运行列表
+                    # 娓呯悊杩愯鍒楄〃
                     del self.running_processes[instance_id]
                     
-                    # ⭐ 清理 Runtime Registry
+                    # 猸?娓呯悊 Runtime Registry
                     if instance_id in self.runtime_registry:
                         runtime_info = self.runtime_registry[instance_id]
                         runtime_info['runtime_status'] = 'stopped'
                         runtime_info['runtime_stopped_at'] = datetime.utcnow()
-                        logger.info(f"✅ Runtime registry updated for {instance_id}: stopped")
+                        logger.info(f"鉁?Runtime registry updated for {instance_id}: stopped")
                 
-                # 🔥 Phase 2-3: 标记为已停止
+                # 馃敟 Phase 2-3: 鏍囪涓哄凡鍋滄
                 bot_instance_registry.mark_stopped(instance_id)
                 
-                # 更新数据库状态
-                bot_creation.status = "stopped"
+                # 鏇存柊鏁版嵁搴撶姸鎬?                bot_creation.status = "stopped"
                 bot_creation.stopped_at = datetime.utcnow()
                 await db.flush()
                 
@@ -548,14 +522,13 @@ class BotInstanceManager:
     
     async def check_health(self, instance_id: str) -> dict:
         """
-        检查Bot实例健康状态（增强版 - 包含心跳检测和僵尸进程检测）
+        妫€鏌ot瀹炰緥鍋ュ悍鐘舵€侊紙澧炲己鐗?- 鍖呭惈蹇冭烦妫€娴嬪拰鍍靛案杩涚▼妫€娴嬶級
         
         Args:
-            instance_id: 实例ID
+            instance_id: 瀹炰緥ID
         
         Returns:
-            健康状态信息
-        """
+            鍋ュ悍鐘舵€佷俊鎭?        """
         result = {
             'instance_id': instance_id,
             'is_healthy': False,
@@ -566,7 +539,7 @@ class BotInstanceManager:
         }
         
         try:
-            # 从数据库获取Bot信息
+            # 浠庢暟鎹簱鑾峰彇Bot淇℃伅
             async with get_db_session() as db:
                 query = select(BotCreation).where(BotCreation.instance_id == instance_id)
                 result_query = await db.execute(query)
@@ -578,7 +551,7 @@ class BotInstanceManager:
                 
                 result['status'] = bot_creation.status
                 
-                # ⭐ 检查是否在 Runtime Registry 中
+                # Check whether the bot exists in the runtime registry
                 if instance_id not in self.runtime_registry:
                     result['is_healthy'] = False
                     result['message'] = 'Not in runtime registry'
@@ -588,56 +561,56 @@ class BotInstanceManager:
                 runtime_info = self.runtime_registry[instance_id]
                 now = datetime.utcnow()
                 
-                # ⭐ 检查进程是否在运行列表中
+                # Check whether the bot exists in the running process list
                 if instance_id in self.running_processes:
                     proc_info = self.running_processes[instance_id]
                     process = proc_info['process']
                     
-                    # 检查进程是否还在运行
+                    # Check whether the process is still alive
                     poll_result = process.poll()
                     
                     if poll_result is None:
-                        # ✅ 进程正在运行
+                        # 鉁?杩涚▼姝ｅ湪杩愯
                         
-                        # ⭐ 计算心跳超时
+                        # 猸?璁＄畻蹇冭烦瓒呮椂
                         last_heartbeat = runtime_info.get('runtime_last_heartbeat')
                         if last_heartbeat:
                             heartbeat_age = (now - last_heartbeat).total_seconds()
                             
                             if heartbeat_age > self.heartbeat_timeout:
-                                # ⚠️ 心跳超时 - 可能是Polling卡死
+                                # 鈿狅笍 蹇冭烦瓒呮椂 - 鍙兘鏄疨olling鍗℃
                                 result['is_healthy'] = False
                                 result['is_zombie'] = True
                                 result['message'] = f'Heartbeat timeout ({heartbeat_age:.0f}s > {self.heartbeat_timeout}s)'
                                 result['health_score'] = 20
                                 runtime_info['runtime_status'] = 'zombie'
                                 logger.warning(
-                                    f"⚠️ Bot {instance_id} is ZOMBIE: "
+                                    f"鈿狅笍 Bot {instance_id} is ZOMBIE: "
                                     f"heartbeat age={heartbeat_age:.0f}s, "
                                     f"PID={process.pid}"
                                 )
                                 
-                                # 尝试自动重启僵尸进程
+                                # 灏濊瘯鑷姩閲嶅惎鍍靛案杩涚▼
                                 await self._auto_restart(instance_id, bot_creation)
                             else:
-                                # ✅ 心跳正常
+                                # 鉁?蹇冭烦姝ｅ父
                                 result['is_healthy'] = True
                                 result['message'] = 'Running normally'
                                 result['health_score'] = 100
                                 runtime_info['runtime_status'] = 'running'
                                 
-                                # 更新心跳时间
+                                # 鏇存柊蹇冭烦鏃堕棿
                                 runtime_info['runtime_last_heartbeat'] = now
                                 bot_creation.last_heartbeat = now
                                 await db.flush()
                         else:
-                            # 首次检查，没有心跳记录
+                            # 棣栨妫€鏌ワ紝娌℃湁蹇冭烦璁板綍
                             result['is_healthy'] = True
                             result['message'] = 'Running (first check)'
                             result['health_score'] = 80
                             runtime_info['runtime_last_heartbeat'] = now
                     else:
-                        # ❌ 进程已退出
+                        # Process has exited
                         result['is_healthy'] = False
                         result['message'] = f'Process exited with code {poll_result}'
                         result['health_score'] = 0
@@ -645,10 +618,10 @@ class BotInstanceManager:
                         bot_creation.status = 'crashed'
                         await db.flush()
                         
-                        # 尝试自动重启
+                        # 灏濊瘯鑷姩閲嶅惎
                         await self._auto_restart(instance_id, bot_creation)
                 else:
-                    # ❌ 不在运行列表中
+                    # Not present in the running process list
                     if bot_creation.status == 'running':
                         result['is_healthy'] = False
                         result['message'] = 'Process not tracked but marked as running'
@@ -661,7 +634,7 @@ class BotInstanceManager:
                         result['message'] = f'Status: {bot_creation.status}'
                         result['health_score'] = 0
                 
-                # 更新 Runtime Registry 的健康度评分
+                # 鏇存柊 Runtime Registry 鐨勫仴搴峰害璇勫垎
                 runtime_info['runtime_health_score'] = result['health_score']
                 
                 return result
@@ -674,37 +647,36 @@ class BotInstanceManager:
     
     async def _auto_restart(self, instance_id: str, bot_creation: BotCreation):
         """
-        自动重启Bot实例（带重启限流策略）
-        
+        鑷姩閲嶅惎Bot瀹炰緥锛堝甫閲嶅惎闄愭祦绛栫暐锛?        
         Args:
-            instance_id: 实例ID
-            bot_creation: Bot创建记录
+            instance_id: 瀹炰緥ID
+            bot_creation: Bot鍒涘缓璁板綍
         """
         try:
             now = time.time()
             
-            # ⭐ 本地测试模式：禁用重启限流
+            # Local test mode: disable restart rate limiting
             if self.max_restarts_in_window is None or self.restart_window_seconds == 0:
                 logger.debug(f"Restart rate limiting disabled (local test mode)")
             else:
-                # ⭐ 运营模式：启用重启限流
-                # 初始化重启时间窗口记录
+                # Runtime mode: enable restart rate limiting
+                # Initialize restart window history
                 if instance_id not in self.restart_timestamps:
                     self.restart_timestamps[instance_id] = []
                 
-                # 清理过期的重启记录（超出时间窗口的）
+                # 娓呯悊杩囨湡鐨勯噸鍚褰曪紙瓒呭嚭鏃堕棿绐楀彛鐨勶級
                 window_start = now - self.restart_window_seconds
                 self.restart_timestamps[instance_id] = [
                     ts for ts in self.restart_timestamps[instance_id]
                     if ts > window_start
                 ]
                 
-                # 检查重启频率限制
+                # Check restart rate limit
                 recent_restarts = len(self.restart_timestamps[instance_id])
                 
                 if recent_restarts >= self.max_restarts_in_window:
                     logger.error(
-                        f"🚫 Restart rate limit exceeded for {instance_id}: "
+                        f"馃毇 Restart rate limit exceeded for {instance_id}: "
                         f"{recent_restarts} restarts in {self.restart_window_seconds}s "
                         f"(max: {self.max_restarts_in_window}). "
                         f"Stopping auto-restart to prevent restart storm."
@@ -720,13 +692,13 @@ class BotInstanceManager:
                     
                     return
             
-            # 本地测试模式：无限制重启
+            # 鏈湴娴嬭瘯妯″紡锛氭棤闄愬埗閲嶅惎
+                self.restart_timestamps.setdefault(instance_id, [])
             if self.max_restart_count is None:
                 restart_count = self.restart_counts.get(instance_id, 0)
                 self.restart_counts[instance_id] = restart_count + 1
                 
-                # ⭐ 记录重启时间戳
-                self.restart_timestamps[instance_id].append(now)
+                # 猸?璁板綍閲嶅惎鏃堕棿鎴?                self.restart_timestamps[instance_id].append(now)
                 
                 logger.info(
                     f"Auto restarting bot {instance_id} "
@@ -734,21 +706,20 @@ class BotInstanceManager:
                     f"{len(self.restart_timestamps[instance_id])} restarts in window)"
                 )
                 
-                # 本地测试：无延迟立即重启
+                # 鏈湴娴嬭瘯锛氭棤寤惰繜绔嬪嵆閲嶅惎
                 if self.restart_delay > 0:
                     await asyncio.sleep(self.restart_delay)
                 
-                # 重新启动
+                # 閲嶆柊鍚姩
                 success = await self.start_bot_instance(bot_creation)
                 
                 if success:
-                    logger.info(f"✅ Bot {instance_id} restarted successfully")
+                    logger.info(f"鉁?Bot {instance_id} restarted successfully")
                 else:
-                    logger.error(f"❌ Failed to restart bot {instance_id}")
+                    logger.error(f"鉂?Failed to restart bot {instance_id}")
                 return
             
-            # 运营模式：检查总重启次数
-            restart_count = self.restart_counts.get(instance_id, 0)
+            # 杩愯惀妯″紡锛氭鏌ユ€婚噸鍚鏁?            restart_count = self.restart_counts.get(instance_id, 0)
             
             if restart_count >= self.max_restart_count:
                 logger.error(
@@ -764,12 +735,12 @@ class BotInstanceManager:
                     pass
                 
                 return
+            self.restart_timestamps.setdefault(instance_id, [])
             
-            # 增加重启计数
+            # 澧炲姞閲嶅惎璁℃暟
             self.restart_counts[instance_id] = restart_count + 1
             
-            # ⭐ 记录重启时间戳
-            self.restart_timestamps[instance_id].append(now)
+            # 猸?璁板綍閲嶅惎鏃堕棿鎴?            self.restart_timestamps[instance_id].append(now)
             
             logger.info(
                 f"Auto restarting bot {instance_id} "
@@ -777,28 +748,26 @@ class BotInstanceManager:
                 f"{len(self.restart_timestamps[instance_id])} restarts in window)"
             )
             
-            # 等待延迟后重启
+            # Wait before restarting
             if self.restart_delay > 0:
                 await asyncio.sleep(self.restart_delay)
             
-            # 重新启动
+            # 閲嶆柊鍚姩
             success = await self.start_bot_instance(bot_creation)
             
             if success:
-                logger.info(f"✅ Bot {instance_id} restarted successfully")
+                logger.info(f"鉁?Bot {instance_id} restarted successfully")
             else:
-                logger.error(f"❌ Failed to restart bot {instance_id}")
+                logger.error(f"鉂?Failed to restart bot {instance_id}")
                 
         except Exception as e:
             logger.error(f"Error auto restarting bot {instance_id}: {e}", exc_info=True)
     
     async def check_all_bots_health(self) -> dict:
         """
-        检查所有Bot实例的健康状态
-        
+        妫€鏌ユ墍鏈塀ot瀹炰緥鐨勫仴搴风姸鎬?        
         Returns:
-            健康检查结果
-        """
+            鍋ュ悍妫€鏌ョ粨鏋?        """
         results = {
             'total': 0,
             'healthy': 0,
@@ -807,7 +776,7 @@ class BotInstanceManager:
         }
         
         try:
-            # 获取所有标记为running的Bot
+            # 鑾峰彇鎵€鏈夋爣璁颁负running鐨凚ot
             async with get_db_session() as db:
                 query = select(BotCreation).where(
                     and_(
@@ -835,18 +804,18 @@ class BotInstanceManager:
         
         except Exception as e:
             logger.error(f"Error in check_all_bots_health: {e}", exc_info=True)
-            # 返回默认结果而不是None
+            # 杩斿洖榛樿缁撴灉鑰屼笉鏄疦one
             return results
         
-        # 如果意外到达这里，也返回默认结果
+        # 濡傛灉鎰忓鍒拌揪杩欓噷锛屼篃杩斿洖榛樿缁撴灉
         return results
     
     async def stop_expired_subscriptions(self) -> dict:
         """
-        停止订阅到期的Bot实例
+        鍋滄璁㈤槄鍒版湡鐨凚ot瀹炰緥
         
         Returns:
-            停止结果统计
+            鍋滄缁撴灉缁熻
         """
         results = {
             'checked': 0,
@@ -856,11 +825,11 @@ class BotInstanceManager:
         }
         
         try:
-            # 获取所有活跃的订阅
+            # 鑾峰彇鎵€鏈夋椿璺冪殑璁㈤槄
             async with get_db_session() as db:
                 now = datetime.utcnow()
                 
-                # 查找已过期的活跃订阅
+                # 鏌ユ壘宸茶繃鏈熺殑娲昏穬璁㈤槄
                 query = select(Subscription).where(
                     and_(
                         Subscription.status == "active",
@@ -875,19 +844,18 @@ class BotInstanceManager:
                 for subscription in expired_subscriptions:
                     telegram_id = subscription.telegram_id
                     
-                    # 检查是否为管理员（管理员的机器人不受订阅限制）
+                    # 妫€鏌ユ槸鍚︿负绠＄悊鍛橈紙绠＄悊鍛樼殑鏈哄櫒浜轰笉鍙楄闃呴檺鍒讹級
                     from ..utils.internal_member_checker import is_admin
                     if await is_admin(telegram_id):
                         logger.info(f"Skipping expired subscription check for admin: {telegram_id}")
-                        # 更新订阅状态为expired，但不停止机器人
+                        # 鏇存柊璁㈤槄鐘舵€佷负expired锛屼絾涓嶅仠姝㈡満鍣ㄤ汉
                         subscription.status = "expired"
                         await db.flush()
                         continue
                     
-                    # 更新订阅状态
-                    subscription.status = "expired"
+                    # 鏇存柊璁㈤槄鐘舵€?                    subscription.status = "expired"
                     
-                    # 查找该用户的所有Bot
+                    # 鏌ユ壘璇ョ敤鎴风殑鎵€鏈塀ot
                     bots_query = select(BotCreation).where(
                         and_(
                             BotCreation.telegram_id == telegram_id,
@@ -897,7 +865,7 @@ class BotInstanceManager:
                     bots_result = await db.execute(bots_query)
                     user_bots = bots_result.scalars().all()
                     
-                    # 停止每个Bot
+                    # 鍋滄姣忎釜Bot
                     for bot in user_bots:
                         try:
                             success = await self.stop_bot_instance(bot.instance_id)
@@ -933,15 +901,12 @@ class BotInstanceManager:
     
     async def cleanup_invalid_instances(self) -> dict:
         """
-        清理无效的Bot实例
+        娓呯悊鏃犳晥鐨凚ot瀹炰緥
         
-        清理条件：
-        1. 状态为error/failed超过7天
-        2. 进程不存在但状态仍为running
-        3. 目录不存在
-        
+        娓呯悊鏉′欢锛?        1. 鐘舵€佷负error/failed瓒呰繃7澶?        2. 杩涚▼涓嶅瓨鍦ㄤ絾鐘舵€佷粛涓簉unning
+        3. 鐩綍涓嶅瓨鍦?        
         Returns:
-            清理结果统计
+            娓呯悊缁撴灉缁熻
         """
         results = {
             'checked': 0,
@@ -955,15 +920,15 @@ class BotInstanceManager:
                 now = datetime.utcnow()
                 seven_days_ago = now - timedelta(days=7)
                 
-                # 查找需要清理的Bot
+                # 鏌ユ壘闇€瑕佹竻鐞嗙殑Bot
                 query = select(BotCreation).where(
                     or_(
-                        # 状态为error/failed超过7天
+                        # Status is error/failed for more than 7 days
                         and_(
                             BotCreation.status.in_(["error", "failed"]),
                             BotCreation.updated_at < seven_days_ago
                         ),
-                        # 状态为stopped超过30天
+                        # Status is stopped for more than 30 days
                         and_(
                             BotCreation.status == "stopped",
                             BotCreation.stopped_at < (now - timedelta(days=30))
@@ -980,17 +945,17 @@ class BotInstanceManager:
                         instance_id = bot.instance_id
                         instance_dir = Path(bot.instance_dir)
                         
-                        # 删除目录
+                        # 鍒犻櫎鐩綍
                         if instance_dir.exists():
                             import shutil
                             shutil.rmtree(instance_dir, ignore_errors=True)
                             logger.info(f"Deleted directory for bot {instance_id}")
                         
-                        # 从运行列表中移除
+                        # 浠庤繍琛屽垪琛ㄤ腑绉婚櫎
                         if instance_id in self.running_processes:
                             del self.running_processes[instance_id]
                         
-                        # 从数据库删除记录
+                        # 浠庢暟鎹簱鍒犻櫎璁板綍
                         await db.delete(bot)
                         
                         results['cleaned'] += 1
@@ -1017,10 +982,10 @@ class BotInstanceManager:
     
     async def load_all_running_bots(self) -> dict:
         """
-        加载并启动数据库中所有标记为running的Bot实例
+        鍔犺浇骞跺惎鍔ㄦ暟鎹簱涓墍鏈夋爣璁颁负running鐨凚ot瀹炰緥
         
         Returns:
-            加载结果统计
+            鍔犺浇缁撴灉缁熻
         """
         results = {
             'total': 0,
@@ -1030,7 +995,7 @@ class BotInstanceManager:
         }
         
         try:
-            # 获取所有标记为running的Bot
+            # 鑾峰彇鎵€鏈夋爣璁颁负running鐨凚ot
             async with get_db_session() as db:
                 query = select(BotCreation).where(
                     and_(
@@ -1070,7 +1035,7 @@ class BotInstanceManager:
                             getattr(bot, "instance_dir", None),
                         )
                         
-                        # 检查是否已经在运行
+                        # 妫€鏌ユ槸鍚﹀凡缁忓湪杩愯
                         if instance_id in self.running_processes:
                             proc_info = self.running_processes[instance_id]
                             if proc_info['process'].poll() is None:
@@ -1078,17 +1043,17 @@ class BotInstanceManager:
                                 results['started'] += 1
                                 continue
                         
-                        # 启动Bot实例
+                        # 鍚姩Bot瀹炰緥
                         success = await self.start_bot_instance(bot)
                         
                         if success:
                             results['started'] += 1
-                            logger.info(f"✅ Bot {instance_id} started successfully")
+                            logger.info(f"鉁?Bot {instance_id} started successfully")
                         else:
                             results['failed'] += 1
-                            logger.error(f"❌ Failed to start bot {instance_id}")
+                            logger.error(f"鉂?Failed to start bot {instance_id}")
                         
-                        # 等待一下，避免同时启动太多进程
+                        # 绛夊緟涓€涓嬶紝閬垮厤鍚屾椂鍚姩澶杩涚▼
                         await asyncio.sleep(1)
                         
                     except Exception as e:
@@ -1103,14 +1068,13 @@ class BotInstanceManager:
     
     async def start_periodic_tasks(self, application):
         """
-        启动周期性任务
-        
+        鍚姩鍛ㄦ湡鎬т换鍔?        
         Args:
-            application: Telegram应用实例
+            application: Telegram搴旂敤瀹炰緥
         """
         from apscheduler.triggers.interval import IntervalTrigger
         
-        # 健康检查任务（每分钟）
+        # 鍋ュ悍妫€鏌ヤ换鍔★紙姣忓垎閽燂級
         health_check_job = application.job_queue.run_repeating(
             lambda context: asyncio.create_task(self._periodic_health_check()),
             interval=self.health_check_interval,
@@ -1119,16 +1083,15 @@ class BotInstanceManager:
         )
         logger.info(f"Bot health check task started (every {self.health_check_interval}s)")
         
-        # 订阅检查任务（每小时）
+        # 璁㈤槄妫€鏌ヤ换鍔★紙姣忓皬鏃讹級
         subscription_check_job = application.job_queue.run_repeating(
             lambda context: asyncio.create_task(self._periodic_subscription_check()),
             interval=self.subscription_check_interval,
-            first=300,  # 5分钟后首次执行
-            name="subscription_check"
+            first=300,  # 5鍒嗛挓鍚庨娆℃墽琛?            name="subscription_check"
         )
         logger.info(f"Subscription check task started (every {self.subscription_check_interval}s)")
         
-        # 清理任务（每天凌晨3点）
+        # 娓呯悊浠诲姟锛堟瘡澶╁噷鏅?鐐癸級
         from apscheduler.triggers.cron import CronTrigger
         cleanup_job = application.job_queue.run_daily(
             lambda context: asyncio.create_task(self._periodic_cleanup()),
@@ -1137,7 +1100,7 @@ class BotInstanceManager:
         )
         logger.info("Daily cleanup task started (at 03:00)")
         
-        # 🆕 数据漂移检测任务（每天凌晨4点执行）
+        # 馃啎 鏁版嵁婕傜Щ妫€娴嬩换鍔★紙姣忓ぉ鍑屾櫒4鐐规墽琛岋級
         drift_check_job = application.job_queue.run_daily(
             lambda context: asyncio.create_task(self._periodic_drift_check()),
             time=datetime.strptime("04:00", "%H:%M").time(),
@@ -1149,15 +1112,15 @@ class BotInstanceManager:
             'health_check': health_check_job,
             'subscription_check': subscription_check_job,
             'cleanup': cleanup_job,
-            'drift_check': drift_check_job  # 🆕
+            'drift_check': drift_check_job  # 馃啎
         }
     
     async def _periodic_health_check(self):
-        """周期性健康检查"""
+        """Periodic health check."""
         try:
             results = await self.check_all_bots_health()
             
-            # 检查results是否为None或不是字典
+            # Validate returned health-check payload
             if results is None or not isinstance(results, dict):
                 logger.warning("Health check returned invalid result")
                 return
@@ -1176,7 +1139,7 @@ class BotInstanceManager:
             logger.error(f"Error in periodic health check: {e}", exc_info=True)
     
     async def _periodic_subscription_check(self):
-        """周期性订阅检查"""
+        """Periodic subscription check."""
         try:
             results = await self.stop_expired_subscriptions()
             
@@ -1192,7 +1155,7 @@ class BotInstanceManager:
             logger.error(f"Error in periodic subscription check: {e}", exc_info=True)
     
     async def _periodic_cleanup(self):
-        """周期性清理"""
+        """Periodic cleanup."""
         try:
             results = await self.cleanup_invalid_instances()
             
@@ -1208,34 +1171,34 @@ class BotInstanceManager:
             logger.error(f"Error in periodic cleanup: {e}", exc_info=True)
     
     async def _periodic_drift_check(self):
-        """🆕 周期性数据漂移检测（每天凌晨4点执行）"""
+        """Periodic data-drift check."""
         try:
             from .data_drift_prevention import data_drift_prevention_system
             
-            logger.info("🔍 Starting daily drift check...")
+            logger.info("馃攳 Starting daily drift check...")
             results = await data_drift_prevention_system.run_full_check()
             
             if results['total_issues'] > 0:
                 logger.warning(
-                    f"📊 Drift check completed: "
+                    f"馃搳 Drift check completed: "
                     f"{results['total_issues']} issues found, "
                     f"{results['fixed_issues']} issues fixed"
                 )
                 
-                # 如果有未修复的问题，发送告警
+                # Alert if some issues remain unfixed
                 if results['total_issues'] > results['fixed_issues']:
                     logger.error(
-                        f"⚠️ Drift check warning: "
+                        f"鈿狅笍 Drift check warning: "
                         f"{results['total_issues'] - results['fixed_issues']} issues NOT fixed!"
                     )
             else:
-                logger.info("✅ Drift check completed: No issues found")
+                logger.info("鉁?Drift check completed: No issues found")
                 
         except Exception as e:
             logger.error(f"Error in periodic drift check: {e}", exc_info=True)
     
     def get_running_count(self) -> int:
-        """获取运行中的Bot数量"""
+        """鑾峰彇杩愯涓殑Bot鏁伴噺"""
         count = 0
         for instance_id, proc_info in self.running_processes.items():
             if proc_info['process'].poll() is None:
@@ -1243,7 +1206,7 @@ class BotInstanceManager:
         return count
     
     def get_all_running_instances(self) -> List[str]:
-        """获取所有运行中的实例ID"""
+        """鑾峰彇鎵€鏈夎繍琛屼腑鐨勫疄渚婭D"""
         running = []
         for instance_id, proc_info in self.running_processes.items():
             if proc_info['process'].poll() is None:
@@ -1252,11 +1215,9 @@ class BotInstanceManager:
     
     def get_runtime_status(self) -> dict:
         """
-        ⭐ 获取所有Bot的运行时状态（用于监控面板）
-        
+        猸?鑾峰彇鎵€鏈塀ot鐨勮繍琛屾椂鐘舵€侊紙鐢ㄤ簬鐩戞帶闈㈡澘锛?        
         Returns:
-            完整的运行时状态信息
-        """
+            瀹屾暣鐨勮繍琛屾椂鐘舵€佷俊鎭?        """
         now = datetime.utcnow()
         status = {
             'total_bots': len(self.runtime_registry),
@@ -1283,17 +1244,17 @@ class BotInstanceManager:
                 'heartbeat_age_seconds': 0
             }
             
-            # 计算运行时间
+            # 璁＄畻杩愯鏃堕棿
             if runtime_info.get('runtime_started_at'):
                 uptime = (now - runtime_info['runtime_started_at']).total_seconds()
                 bot_status['uptime_seconds'] = int(uptime)
             
-            # 计算心跳年龄
+            # 璁＄畻蹇冭烦骞撮緞
             if runtime_info.get('runtime_last_heartbeat'):
                 heartbeat_age = (now - runtime_info['runtime_last_heartbeat']).total_seconds()
                 bot_status['heartbeat_age_seconds'] = int(heartbeat_age)
             
-            # 统计各种状态的Bot数量
+            # 缁熻鍚勭鐘舵€佺殑Bot鏁伴噺
             bot_state = runtime_info.get('runtime_status', 'unknown')
             if bot_state == 'running':
                 status['running_bots'] += 1
@@ -1311,5 +1272,5 @@ class BotInstanceManager:
         return status
 
 
-# 全局实例管理器
-bot_instance_manager = BotInstanceManager()
+# 鍏ㄥ眬瀹炰緥绠＄悊鍣?bot_instance_manager = BotInstanceManager()
+
