@@ -1,0 +1,105 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.sqlite3
+*.db
+accounting_bot_test.db
+data/
+
+# Environment (包含敏感信息)
+.env
+.env.test
+.env.prod
+.env.*
+*.env.bak
+
+# SSL Certificates (Never commit!)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+*.pem
+*.key
+*.crt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Bot instances data
+bot_instances/
+bot_data/
+persistence_*.pickle
+
+# Test files and scripts
+start_test_bot.py
+test_*.py
+debug_*.py
+check_*.py
+simple_test.py
+
+# Backups
+backups/
+*.zip
+*.db.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test and debug files
+tests/
+test_*.py
+debug_*.py
+check_*.py
+simple_test.py
+*.json
+*_EXAMPLE.py
+
+# Backup directories
+backup_sql_fix/
+backups/
+
+# Documentation (not needed for production deployment)
+*.md
+!README.md
+!DEPLOY.md
+
+# Scripts (not needed for production)
+package*.ps1
+*.bat
+cleanup_*.py
+clear_*.py
+create_*.py
+fix_*.py
+migrate_*.py
+query_*.py
+restore_*.py
+update_*.py
+*_COMPLETE.md
+*_GUIDE.md
+*_EXAMPLES.py
+
+# Temporary files
+*.tmp
+*.temp
+
+# Keep real regression tests versioned; root-level ad hoc test_*.py files stay ignored above.
+!tests/
+!tests/**/*.py

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账单分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-4">
+        <!-- 头部 -->
+        <header class="bg-white rounded-lg shadow p-4 mb-4">
+            <h1 class="text-2xl font-bold text-gray-800">📊 今日账单</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ data.date }}</p>
+        </header>
+        
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="bg-green-50 rounded-lg p-4">
+                <div class="text-sm text-green-600">今日入款</div>
+                <div class="text-2xl font-bold text-green-700">
+                    {{ data.summary.total_deposit }} {{ data.summary.currency }}
+                </div>
+            </div>
+            <div class="bg-red-50 rounded-lg p-4">
+                <div class="text-sm text-red-600">今日下发</div>
+                <div class="text-2xl font-bold text-red-700">
+                    {{ data.summary.total_withdraw }} {{ data.summary.currency }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 图表 -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <div id="chart" style="height: 300px;"></div>
+        </div>
+        
+        <!-- 明细列表 -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-lg font-semibold mb-3">入款明细 ({{ data.deposits|length }}笔)</h2>
+            {% if data.deposits %}
+            <div class="space-y-2">
+                {% for deposit in data.deposits %}
+                <div class="flex justify-between items-center p-2 border-b hover:bg-gray-50">
+                    <div>
+                        <div class="font-medium">{{ deposit.user_name }}</div>
+                        <div class="text-xs text-gray-500">{{ deposit.time }}</div>
+                        {% if deposit.remark %}
+                        <div class="text-xs text-gray-400">{{ deposit.remark }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="text-green-600 font-bold">+{{ deposit.amount }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-gray-400 py-4">暂无入款记录</div>
+            {% endif %}
+            
+            <h2 class="text-lg font-semibold mt-6 mb-3">下发明细 ({{ data.withdraws|length }}笔)</h2>
+            {% if data.withdraws %}
+            <div class="space-y-2">
+                {% for withdraw in data.withdraws %}
+                <div class="flex justify-between items-center p-2 border-b hover:bg-gray-50">
+                    <div>
+                        <div class="font-medium">{{ withdraw.user_name }}</div>
+                        <div class="text-xs text-gray-500">{{ withdraw.time }}</div>
+                        {% if withdraw.remark %}
+                        <div class="text-xs text-gray-400">{{ withdraw.remark }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="text-red-600 font-bold">-{{ withdraw.amount|abs }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-gray-400 py-4">暂无下发记录</div>
+            {% endif %}
+        </div>
+        
+        <!-- 底部按钮 -->
+        <div class="mt-4 space-y-2">
+            <a href="/api/export/excel?chatId={{ chat_id }}&token={{ request.args.get('token') }}&days=30"
+               class="block w-full bg-green-500 hover:bg-green-600 text-white text-center py-3 rounded-lg transition">
+                📥 导出 Excel（30天）
+            </a>
+        </div>
+        
+        <!-- 页脚 -->
+        <footer class="text-center text-xs text-gray-400 mt-6 pb-4">
+            由记账机器人提供技术支持
+        </footer>
+    </div>
+    
+    <script>
+        // ECharts 图表初始化
+        var chart = echarts.init(document.getElementById('chart'));
+        var option = {
+            title: { 
+                text: '收支对比',
+                left: 'center',
+                textStyle: {
+                    fontSize: 14
+                }
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
+                }
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                data: ['入款', '下发'],
+                axisTick: {
+                    alignWithLabel: true
+                }
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [{
+                name: '金额',
+                type: 'bar',
+                barWidth: '60%',
+                data: [
+                    {{ data.summary.total_deposit }},
+                    {{ data.summary.total_withdraw }}
+                ],
+                itemStyle: {
+                    color: function(params) {
+                        return params.dataIndex === 0 ? '#10b981' : '#ef4444';
+                    }
+                },
+                label: {
+                    show: true,
+                    position: 'top',
+                    formatter: '{c}'
+                }
+            }]
+        };
+        chart.setOption(option);
+        
+        // 响应式调整
+        window.addEventListener('resize', function() {
+            chart.resize();
+        });
+    </script>
+</body>
+</html>

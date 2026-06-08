@@ -1,0 +1,39 @@
+
+============================================================
+动态权限菜单系统 - 测试报告
+============================================================
+
+测试时间：2026-05-20 21:19:46
+总测试数：6
+通过数量：4 ✅
+失败数量：2 ❌
+通过率：66.7%
+
+============================================================
+详细结果：
+============================================================
+
+1. [❌ FAIL] 数据库迁移状态
+   检查失败: (sqlite3.OperationalError) no such column: admins.can_billing
+[SQL: SELECT admins.bot_id, admins.user_id, admins.username, admins.first_name, admins.last_name, admins.is_active, admins.permissions, admins.permission_level, admins.can_create_bot, admins.can_manage_admins, admins.can_manage_group_members, admins.can_broadcast, admins.can_set_day_cut, admins.can_set_keywords, admins.can_billing, admins.can_query, admins.can_settings, admins.can_renew, admins.added_by, admins.added_by_username, admins.note, admins.id, admins.created_at, admins.updated_at 
+FROM admins
+ LIMIT ? OFFSET ?]
+[parameters: (1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2. [❌ FAIL] 权限体系配置
+   检查失败: (sqlite3.OperationalError) no such column: admins.can_billing
+[SQL: SELECT admins.bot_id, admins.user_id, admins.username, admins.first_name, admins.last_name, admins.is_active, admins.permissions, admins.permission_level, admins.can_create_bot, admins.can_manage_admins, admins.can_manage_group_members, admins.can_broadcast, admins.can_set_day_cut, admins.can_set_keywords, admins.can_billing, admins.can_query, admins.can_settings, admins.can_renew, admins.added_by, admins.added_by_username, admins.note, admins.id, admins.created_at, admins.updated_at 
+FROM admins]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+3. [✅ PASS] 菜单模板完整性
+   所有6个权限等级都有菜单配置
+4. [✅ PASS] 菜单生成服务
+   MenuGeneratorService.generate_main_menu 方法存在
+5. [✅ PASS] Handler文件完整性
+   所有 5 个Handler文件都存在
+6. [✅ PASS] Handler导入情况
+   所有关键Handler都已导入
+
+============================================================
+⚠️ 有 2 个测试失败，请检查后重试。
+============================================================

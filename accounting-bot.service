@@ -1,0 +1,42 @@
+[Unit]
+Description=Telegram Accounting Bot Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/accounting-bot
+
+# 环境变量文件
+EnvironmentFile=/opt/accounting-bot/.env
+
+# Python虚拟环境路径(根据实际安装位置修改)
+Environment=PATH=/opt/accounting-bot/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 启动命令
+ExecStart=/opt/accounting-bot/venv/bin/python main.py
+
+# 自动重启配置
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=5
+
+# 资源限制
+MemoryMax=512M
+CPUQuota=80%
+
+# 日志配置
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=accounting-bot
+
+# 安全配置
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/accounting-bot/logs /opt/accounting-bot/backups /opt/accounting-bot/bot_instances
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saas-bot
+    env_file:
+      - .env
+    ports:
+      - "8081:8081"
+    networks:
+      - saas-network
+    restart: always
+    user: "0:0"
+    volumes:
+      - /opt/saas-bot/data:/app/data
+      - /opt/saas-bot/instances:/app/instances
+      - /opt/saas-bot/backups:/app/backups
+      - /opt/saas-bot/logs:/app/logs
+      - /opt/saas-bot/bot_instances:/app/bot_instances
+      - /opt/saas-bot/.env:/app/.env:ro
+
+networks:
+  saas-network:
+    driver: bridge

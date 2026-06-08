@@ -1,0 +1,67 @@
+# Git 目录
+.git
+.gitignore
+
+# 环境文件（使用.env.production）
+.env
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 数据库文件（会被挂载覆盖）
+*.sqlite3
+*.db
+accounting_bot_test.db
+data/
+
+# 测试和文档（生产环境不需要）
+tests/
+docs/
+
+# 脚本文件（生产环境不需要）
+# scripts/  <- 注释掉这行，因为初始化脚本需要在容器中运行
+*.ps1
+*.bat
+*.sh
+cleanup*.py
+clear*.py
+create*.py
+debug*.py
+fix*.py
+migrate*.py
+query*.py
+restore*.py
+update*.py
+test*.py
+check*.py
+*_EXAMPLE.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志和备份
+logs/
+backups/
+
+# Bot 实例数据
+bot_instances/
+bot_data/
+persistence*.pickle
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# Python 缓存（所有子目录）
+config/__pycache__/
+src/**/__pycache__/
