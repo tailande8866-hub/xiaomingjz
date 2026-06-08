@@ -223,9 +223,21 @@ async def _detect_user_identity(user_id: int, bot_id: str, db) -> dict:
             result['identity'] = 'super_admin'
             result['role_name'] = '超级管理员'
             # 超级管理员查询自己的机器人
-            bot_query = select(BotCreation).where(BotCreation.super_admin_id == user_id)
-            bot_result = await db.execute(bot_query)
-            bot_creation = bot_result.scalar_one_or_none()
+            bot_creation = None
+            if bot_id:
+                current_query = select(BotCreation).where(BotCreation.instance_id == bot_id)
+                current_result = await db.execute(current_query)
+                bot_creation = current_result.scalars().first()
+                if bot_creation and getattr(bot_creation, 'super_admin_id', None) != user_id:
+                    bot_creation = None
+            if not bot_creation:
+                bot_query = (
+                    select(BotCreation)
+                    .where(BotCreation.super_admin_id == user_id)
+                    .order_by(BotCreation.created_at.desc())
+                )
+                bot_result = await db.execute(bot_query)
+                bot_creation = bot_result.scalars().first()
             if bot_creation:
                 result['bot_creation'] = bot_creation
                 result['bot_username'] = f"@{bot_creation.bot_username}" if bot_creation.bot_username else 'N/A'
