@@ -454,17 +454,18 @@ class SaaSAutoService:
                         if not success:
                             bot_creation.status = "error"
                             await db.commit()
-                            
+
                             # 回滚：删除目录和数据库记录
                             if instance_dir and instance_dir.exists():
                                 shutil.rmtree(instance_dir, ignore_errors=True)
-                            
+
                             # 删除数据库记录
                             await db.delete(bot_creation)
                             await db.commit()
-                            
+
                             result_tuple = (False, "Bot启动失败", None)
-                        
+                            return result_tuple
+
                         # 验证Bot是否成功启动（等待3秒）
                         await asyncio.sleep(3)
                         
@@ -513,6 +514,9 @@ class SaaSAutoService:
                         else:
                             bot_creation.status = "error"
                             logger.error(f"Bot {instance_id} health check failed: {health['message']}")
+                            await db.commit()
+                            result_tuple = (False, f"Bot启动后健康检查失败: {health['message']}", None)
+                            return result_tuple
                         
                         await db.commit()
                         

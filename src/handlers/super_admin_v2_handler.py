@@ -613,9 +613,12 @@ async def _provision_or_create_bot(
         if bot_creation:
             try:
                 from ..services.bot_instance_manager import bot_instance_manager
-                await bot_instance_manager.start_bot_instance(bot_creation)
+                started = await bot_instance_manager.start_bot_instance(bot_creation)
+                if not started:
+                    return False, "子Bot启动失败", None, None
             except Exception:
                 traceback.print_exc()
+                return False, "子Bot启动异常", None, None
         return True, "extended", bot_creation, expire_time
 
     success, create_message, bot_creation = await manual_provision_service.manual_create_bot(
@@ -633,9 +636,12 @@ async def _provision_or_create_bot(
     if bot_creation:
         try:
             from ..services.bot_instance_manager import bot_instance_manager
-            await bot_instance_manager.start_bot_instance(bot_creation)
+            started = await bot_instance_manager.start_bot_instance(bot_creation)
+            if not started:
+                return False, "子Bot启动失败", None, None
         except Exception:
             traceback.print_exc()
+            return False, "子Bot启动异常", None, None
     return True, "created", bot_creation, expire_time
 
 
