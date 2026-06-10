@@ -401,6 +401,32 @@ class BotInstanceManager:
                 'restart_count': self.restart_counts.get(instance_id, 0)
             }
             self.running_processes[instance_id] = process_info
+
+            await asyncio.sleep(1.5)
+            quick_exit_code = process.poll()
+            if quick_exit_code is not None:
+                bot_log_path = resolved_instance_dir / "bot.log"
+                error_log_path = resolved_instance_dir / "error.log"
+
+                def _read_tail(path: Path) -> str:
+                    if not path.exists():
+                        return ""
+                    try:
+                        return path.read_text(encoding="utf-8", errors="ignore")[-4000:]
+                    except Exception:
+                        return ""
+
+                logger.error(
+                    "[BotInstanceManager] BOT %s exited immediately with code %s\nBOT.LOG:\n%s\nERROR.LOG:\n%s",
+                    instance_id,
+                    quick_exit_code,
+                    _read_tail(bot_log_path) or "<empty>",
+                    _read_tail(error_log_path) or "<empty>",
+                )
+                self.running_processes.pop(instance_id, None)
+                self.runtime_registry.pop(instance_id, None)
+                bot_instance_registry.mark_failed(instance_id, f"quick_exit:{quick_exit_code}")
+                return False
             
             # 猸?鍒濆鍖?Runtime Registry
             now = datetime.utcnow()

@@ -346,13 +346,12 @@ async def _find_user_bot(user_id: int) -> BotCreation | None:
         return usable_bot or (bots[0] if bots else None)
 
 
-async def _update_bot_expire_time(user_id: int, expire_time: datetime):
+async def _update_bot_expire_time(user_id: int, expire_time: datetime, instance_id: str | None = None):
     async with get_db_session() as db:
-        result = await db.execute(
-            select(BotCreation)
-            .where(BotCreation.telegram_id == user_id)
-            .order_by(desc(BotCreation.created_at))
-        )
+        query = select(BotCreation).where(BotCreation.telegram_id == user_id)
+        if instance_id:
+            query = query.where(BotCreation.instance_id == instance_id)
+        result = await db.execute(query.order_by(desc(BotCreation.created_at)))
         bot = result.scalars().first()
         if bot:
             bot.expire_time = expire_time
@@ -609,7 +608,7 @@ async def _provision_or_create_bot(
     existing_bot = await _find_user_bot(target_user_id)
 
     if existing_bot:
-        bot_creation = await _update_bot_expire_time(target_user_id, expire_time)
+        bot_creation = await _update_bot_expire_time(target_user_id, expire_time, existing_bot.instance_id)
         if bot_creation:
             try:
                 from ..services.bot_instance_manager import bot_instance_manager
@@ -632,7 +631,11 @@ async def _provision_or_create_bot(
     if not success:
         return False, create_message, None, None
 
-    bot_creation = await _update_bot_expire_time(target_user_id, expire_time)
+    bot_creation = await _update_bot_expire_time(
+        target_user_id,
+        expire_time,
+        bot_creation.instance_id if bot_creation else None,
+    )
     if bot_creation:
         try:
             from ..services.bot_instance_manager import bot_instance_manager

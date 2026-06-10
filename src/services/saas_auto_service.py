@@ -235,24 +235,30 @@ class SaaSAutoService:
                         await db.commit()
                         await db.refresh(existing)
                         
-                        # ✅ 关键修复：同步更新 .env 文件
+                        # 重建运行时文件，避免旧实例缺少 .env / start.py
                         try:
-                            if existing.instance_dir:
-                                env_path = Path(existing.instance_dir) / ".env"
-                                if env_path.exists():
-                                    # 生成新的 .env 文件内容
-                                    env_content = self._generate_env_file(
-                                        bot_token=bot_token,
-                                        bot_username=bot_username,
-                                        telegram_id=telegram_id,
-                                        instance_id=existing.instance_id
-                                    )
-                                    env_path.write_text(env_content, encoding="utf-8")
-                                    logger.info(f"✅ Updated .env file for {existing.instance_id}")
-                                else:
-                                    logger.warning(f".env file not found: {env_path}")
+                            existing_instance_dir = Path(existing.instance_dir) if existing.instance_dir else (self.base_instances_dir / existing.instance_id)
+                            existing_instance_dir.mkdir(parents=True, exist_ok=True)
+                            existing.instance_dir = str(existing_instance_dir)
+                            existing.env_path = str(existing_instance_dir / ".env")
+
+                            env_path = existing_instance_dir / ".env"
+                            env_content = self._generate_env_file(
+                                bot_token=bot_token,
+                                bot_username=bot_username,
+                                telegram_id=telegram_id,
+                                instance_id=existing.instance_id
+                            )
+                            env_path.write_text(env_content, encoding="utf-8")
+
+                            start_path = existing_instance_dir / "start.py"
+                            start_path.write_text(
+                                self._generate_start_file(existing.instance_id, bot_token),
+                                encoding="utf-8",
+                            )
+                            logger.info(f"Rebuilt runtime files for {existing.instance_id}")
                         except Exception as e:
-                            logger.error(f"Failed to update .env file: {e}")
+                            logger.error(f"Failed to rebuild runtime files: {e}", exc_info=True)
                         
                         # 重启 Bot 实例
                         try:
