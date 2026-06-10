@@ -1203,17 +1203,25 @@ async def handle_super_admin_private_message(update: Update, context: ContextTyp
                 repo = PendingProvisionRepo(db, SUPER_ADMIN_SCOPE_BOT_ID)
                 pending = await repo.get_pending(user.id)
                 if pending and pending.mode == "user_send" and not pending.completed:
-                    existing_bot = await _find_user_bot(user.id)
-                    if existing_bot and (existing_bot.token_status or "normal").lower() != "invalid":
-                        await repo.complete_provision(user.id)
-                        await db.commit()
+                    is_token_message = bool(message.text and TOKEN_PATTERN.match(message.text.strip()))
+                    if is_token_message:
                         logger.info(
-                            "[SA_V2] final override cleared stale pending provision for user_id=%s instance_id=%s current_bot_id=%s",
+                            "[SA_V2] final override preserving pending provision for token input user_id=%s current_bot_id=%s",
                             user.id,
-                            existing_bot.instance_id,
                             current_bot_id,
                         )
-                        return
+                    else:
+                        existing_bot = await _find_user_bot(user.id)
+                        if existing_bot and (existing_bot.token_status or "normal").lower() != "invalid":
+                            await repo.complete_provision(user.id)
+                            await db.commit()
+                            logger.info(
+                                "[SA_V2] final override cleared stale pending provision for user_id=%s instance_id=%s current_bot_id=%s",
+                                user.id,
+                                existing_bot.instance_id,
+                                current_bot_id,
+                            )
+                            return
 
         if user and _is_super_admin(user.id):
             async with get_db_session() as db:
