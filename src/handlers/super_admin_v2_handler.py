@@ -908,34 +908,45 @@ async def handle_super_admin_private_message(update: Update, context: ContextTyp
 
             return
 
-        if _is_super_admin_scope_runtime(current_bot_id):
-            async with get_db_session() as db:
-                repo = PendingProvisionRepo(db, SUPER_ADMIN_SCOPE_BOT_ID)
-                pending = await repo.get_pending(user_id)
-                if pending and pending.mode == "user_send" and not pending.completed:
-                    if not message.text or not TOKEN_PATTERN.match(message.text.strip()):
-                        await message.reply_text("您的Token已失效/过期，请重新发送新Token激活")
-                        return
-
-                    success, create_message, bot_creation, expire_time = await _provision_or_create_bot(
-                        target_user_id=user_id,
-                        username=pending.username or (user.username if user else None),
-                        days=pending.duration_days,
-                        token=message.text.strip(),
-                    )
-                    if not success or not bot_creation or not expire_time:
-                        await message.reply_text(f"❌ 创建失败\n\n{create_message}")
-                        return
-
-                    await repo.receive_token(user_id, token_encryptor.encrypt_to_base64(message.text.strip()))
-                    await repo.complete_provision(user_id)
-                    await db.commit()
-                    await _send_created_bot_success_card(context.bot, user_id, bot_creation, expire_time)
-                    try:
-                        await context.bot.send_message(chat_id=SUPER_ADMIN_ID, text=f"✅ 用户{user_id}已自主完成Token创建")
-                    except Exception:
-                        traceback.print_exc()
+        async with get_db_session() as db:
+            repo = PendingProvisionRepo(db, SUPER_ADMIN_SCOPE_BOT_ID)
+            pending = await repo.get_pending(user_id)
+            if pending and pending.mode == "user_send" and not pending.completed:
+                logger.info(
+                    "[SA_V2] pending user_send token received user_id=%s current_bot_id=%s token_like=%s",
+                    user_id,
+                    current_bot_id,
+                    bool(message.text and TOKEN_PATTERN.match(message.text.strip())),
+                )
+                if not message.text or not TOKEN_PATTERN.match(message.text.strip()):
+                    await message.reply_text("您的Token已失效/过期，请重新发送新Token激活")
                     return
+
+                success, create_message, bot_creation, expire_time = await _provision_or_create_bot(
+                    target_user_id=user_id,
+                    username=pending.username or (user.username if user else None),
+                    days=pending.duration_days,
+                    token=message.text.strip(),
+                )
+                if not success or not bot_creation or not expire_time:
+                    logger.error(
+                        "[SA_V2] pending user_send create failed user_id=%s current_bot_id=%s message=%s",
+                        user_id,
+                        current_bot_id,
+                        create_message,
+                    )
+                    await message.reply_text(f"❌ 创建失败\n\n{create_message}")
+                    return
+
+                await repo.receive_token(user_id, token_encryptor.encrypt_to_base64(message.text.strip()))
+                await repo.complete_provision(user_id)
+                await db.commit()
+                await _send_created_bot_success_card(context.bot, user_id, bot_creation, expire_time)
+                try:
+                    await context.bot.send_message(chat_id=SUPER_ADMIN_ID, text=f"✅ 用户{user_id}已自主完成Token创建")
+                except Exception:
+                    traceback.print_exc()
+                return
     except Exception:
         traceback.print_exc()
         logger.error("handle_super_admin_private_message failed", exc_info=True)
